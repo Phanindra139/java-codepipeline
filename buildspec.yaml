@@ -1,0 +1,31 @@
+version: 0.2
+env:
+  secrets-manager:
+    LOGIN: java:sonartoken
+    HOST: java:HOST
+    Organization: java:Organization
+    Project: java:Project
+phases:
+  install:
+    runtime-versions:
+      java: corretto17
+    commands:
+      - yum update -y
+   #   - yum install -y jq
+      - wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-3.3.0.1492-linux.zip
+      - unzip ./sonar-scanner-cli-3.3.0.1492-linux.zip
+      - export PATH=$PATH:./sonar-scanner-3.3.0.1492-linux/bin/
+  pre_build:
+    commands:
+      - mvn test
+      - mvn sonar:sonar -Dsonar.login=$LOGIN -Dsonar.host.url=$HOST -Dsonar.projectKey=$Project -Dsonar.organization=$Organization
+      - sleep 5
+      - curl https://sonarcloud.io/api/qualitygates/project_status?projectKey=$Project >result.json
+      - cat result.json
+      - if [ $(jq -r '.projectStatus.status' result.json) = ERROR ] ; then $CODEBUILD_BUILD_SUCCEEDING -eq 0 ;fi
+  build:
+    commands:
+      - mvn clean package
+      - mvn package
+      - echo Building Project
+      - echo Finished Building
